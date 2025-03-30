@@ -26,6 +26,11 @@ namespace JobManagement.Infrastructure.Data
         public DbSet<JobLog> JobLogs { get; set; }
         public DbSet<JobQueueState> JobQueueStates { get; set; }
 
+        public DbSet<JobMetric> JobMetrics { get; set; }
+        public DbSet<WorkerMetric> WorkerMetrics { get; set; }
+        public DbSet<QueueMetric> QueueMetrics { get; set; }
+        public DbSet<MetricSnapshot> MetricSnapshots { get; set; }
+
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             UpdateAuditableEntities();

@@ -1,7 +1,7 @@
 ﻿using JobManagement.Application.BackgroundServices;
 using JobManagement.Application.Services;
-using JobManagement.Domain.Interfaces;
 using JobManagement.Infrastructure.Interfaces;
+using JobManagement.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JobManagement.Application.Extensions
@@ -18,8 +18,12 @@ namespace JobManagement.Application.Extensions
             services.AddScoped<IJobExecutionService, JobExecutionService>();
             services.AddScoped<IWorkerAssignmentService, WorkerAssignmentService>();
 
-            // Register background service
+            // Register metrics services
+            services.AddScoped<IMetricsService, MetricsService>();
+
+            // Register background services
             services.AddHostedService<QueueProcessingService>();
+            services.AddHostedService<MetricsCollectionService>();
 
             return services;
         }
