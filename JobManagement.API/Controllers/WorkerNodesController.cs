@@ -1,4 +1,5 @@
-﻿using JobManagement.Application.Services;
+﻿using JobManagement.Application.dtos;
+using JobManagement.Application.Services.WorkerNodes;
 using JobManagement.Domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,45 +13,49 @@ namespace JobManagement.API.Controllers
     [Route("api/[controller]")]
     public class WorkerNodesController : ControllerBase
     {
-        private readonly WorkerNodeService _workerNodeService;
+        private readonly IWorkerNodeService _workerNodeService;
         private readonly ILogger<WorkerNodesController> _logger;
 
-        public WorkerNodesController(WorkerNodeService workerNodeService, ILogger<WorkerNodesController> logger)
+        public WorkerNodesController(IWorkerNodeService workerNodeService, ILogger<WorkerNodesController> logger)
         {
             _workerNodeService = workerNodeService;
             _logger = logger;
         }
 
-        // Request models
+        // Request models - Updated to include Power property
         public class RegisterWorkerRequest
         {
             public string Name { get; set; }
             public string Endpoint { get; set; }
             public int Capacity { get; set; } = 5;
+            public int Power { get; set; } = 5; // Default to medium power (1-10 scale)
         }
 
         public class UpdateWorkerRequest
         {
             public string Endpoint { get; set; }
             public int Capacity { get; set; }
+            public int Power { get; set; }
         }
 
         [HttpGet]
-        [ProducesResponseType(typeof(IEnumerable<WorkerNode>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(IEnumerable<WorkerNodeDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAllWorkerNodes([FromQuery] bool onlyAvailable = false)
         {
             try
             {
+                IReadOnlyList<WorkerNode> workers;
                 if (onlyAvailable)
                 {
-                    var workers = await _workerNodeService.GetAvailableWorkerNodesAsync();
-                    return Ok(workers);
+                    workers = await _workerNodeService.GetAvailableWorkerNodesAsync();
                 }
                 else
                 {
-                    var workers = await _workerNodeService.GetAllWorkerNodesAsync();
-                    return Ok(workers);
+                    workers = await _workerNodeService.GetAllWorkerNodesAsync();
                 }
+
+                var workerDtos = workers.Select(WorkerNodeDto.FromEntity).ToList();
+                return Ok(workerDtos);
             }
             catch (Exception ex)
             {
@@ -60,9 +65,9 @@ namespace JobManagement.API.Controllers
         }
 
         [HttpGet("{id}")]
-        [ProducesResponseType(typeof(WorkerNode), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(WorkerNodeDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetWorkerNodeById(int id)
+        public async Task<IActionResult> GetWorkerNodeById(Guid id)
         {
             try
             {
@@ -71,7 +76,10 @@ namespace JobManagement.API.Controllers
                 {
                     return NotFound($"Worker node with ID {id} not found.");
                 }
-                return Ok(worker);
+
+                // Convert to DTO to avoid circular references
+                var workerDto = WorkerNodeDto.FromEntity(worker);
+                return Ok(workerDto);
             }
             catch (Exception ex)
             {
@@ -97,10 +105,17 @@ namespace JobManagement.API.Controllers
                     return BadRequest("Worker node endpoint is required.");
                 }
 
+                // Validate power range
+                if (request.Power < 1 || request.Power > 10)
+                {
+                    return BadRequest("Worker node power must be between 1 and 10.");
+                }
+
                 var worker = await _workerNodeService.RegisterWorkerNodeAsync(
                     request.Name,
                     request.Endpoint,
-                    request.Capacity);
+                    request.Capacity,
+                    request.Power);
 
                 return CreatedAtAction(nameof(GetWorkerNodeById), new { id = worker.Id }, worker);
             }
@@ -114,11 +129,18 @@ namespace JobManagement.API.Controllers
         [HttpPut("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdateWorkerNode(int id, [FromBody] UpdateWorkerRequest request)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpdateWorkerNode(Guid id, [FromBody] UpdateWorkerRequest request)
         {
             try
             {
-                var worker = await _workerNodeService.UpdateWorkerNodeAsync(id, request.Endpoint, request.Capacity);
+                // Validate power range
+                if (request.Power < 1 || request.Power > 10)
+                {
+                    return BadRequest("Worker node power must be between 1 and 10.");
+                }
+
+                var worker = await _workerNodeService.UpdateWorkerNodeAsync(id, request.Endpoint, request.Capacity, request.Power);
                 if (worker == null)
                 {
                     return NotFound($"Worker node with ID {id} not found.");
@@ -135,7 +157,7 @@ namespace JobManagement.API.Controllers
         [HttpPost("{id}/heartbeat")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdateHeartbeat(int id)
+        public async Task<IActionResult> UpdateHeartbeat(Guid id)
         {
             try
             {
@@ -156,7 +178,7 @@ namespace JobManagement.API.Controllers
         [HttpPost("{id}/deactivate")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> DeactivateWorkerNode(int id)
+        public async Task<IActionResult> DeactivateWorkerNode(Guid id)
         {
             try
             {
@@ -178,7 +200,7 @@ namespace JobManagement.API.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> DeleteWorkerNode(int id)
+        public async Task<IActionResult> DeleteWorkerNode(Guid id)
         {
             try
             {
@@ -209,7 +231,7 @@ namespace JobManagement.API.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> AssignJobToWorker(int workerId, int jobId)
+        public async Task<IActionResult> AssignJobToWorker(Guid workerId, Guid jobId)
         {
             try
             {
@@ -232,7 +254,7 @@ namespace JobManagement.API.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> UpdateWorkerLoad(int workerId, [FromBody] int currentLoad)
+        public async Task<IActionResult> UpdateWorkerLoad(Guid workerId, [FromBody] int currentLoad)
         {
             try
             {

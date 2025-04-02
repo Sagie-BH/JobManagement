@@ -13,16 +13,13 @@ namespace JobManagement.Infrastructure.Extensions
     {
         public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
         {
-            // Register DbContext
             services.AddDbContext<AppDbContext>(options =>
-                options.UseMySql(
+                options.UseSqlServer(
                     configuration.GetConnectionString("DefaultConnection"),
-                    new MySqlServerVersion(new Version(8, 0, 21)),
                     b => b.MigrationsAssembly("JobManagement.Infrastructure")
                 )
             );
 
-            // Register repositories and unit of work
             services.AddRepositories();
 
             // Register queue services
@@ -41,9 +38,11 @@ namespace JobManagement.Infrastructure.Extensions
 
         public static IServiceCollection AddQueueServices(this IServiceCollection services)
         {
-            services.AddSingleton<IJobQueue, PriorityJobQueue>();
+            services.AddScoped<IJobQueue, PriorityJobQueue>();
 
             return services;
         }
     }
+
+
 }

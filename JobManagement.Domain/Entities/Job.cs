@@ -1,4 +1,5 @@
 ﻿using JobManagement.Domain.Enums;
+using System.Text.Json.Serialization;
 
 namespace JobManagement.Domain.Entities
 {
@@ -8,8 +9,9 @@ namespace JobManagement.Domain.Entities
         public string ExecutionPayload { get; set; }
         public int MaxRetryAttempts { get; set; } = 3;
         public int CurrentRetryCount { get; set; } = 0;
-        public string WorkerNodeId { get; set; }
-        public virtual WorkerNode AssignedWorker { get; set; }
+        public Guid? WorkerNodeId { get; set; }
+        [JsonIgnore]
+        public virtual WorkerNode? AssignedWorker { get; set; }
         public DateTime? ScheduledStartTime { get; set; }
         public JobType Type { get; set; } = JobType.Generic;
         public virtual ICollection<JobLog> ExecutionLogs { get; set; } = new List<JobLog>();

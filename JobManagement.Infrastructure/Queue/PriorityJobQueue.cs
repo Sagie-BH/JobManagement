@@ -11,25 +11,25 @@ namespace JobManagement.Infrastructure.Queue
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<PriorityJobQueue> _logger;
-        private readonly ConcurrentDictionary<JobPriority, ConcurrentQueue<int>> _jobQueues;
+        private readonly ConcurrentDictionary<JobPriority, ConcurrentQueue<Guid>> _jobQueues;
 
         public PriorityJobQueue(IUnitOfWork unitOfWork, ILogger<PriorityJobQueue> logger)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
-            _jobQueues = new ConcurrentDictionary<JobPriority, ConcurrentQueue<int>>();
+            _jobQueues = new ConcurrentDictionary<JobPriority, ConcurrentQueue<Guid>>();
 
             // Initialize queues for each priority level
             foreach (JobPriority priority in Enum.GetValues(typeof(JobPriority)))
             {
-                _jobQueues[priority] = new ConcurrentQueue<int>();
+                _jobQueues[priority] = new ConcurrentQueue<Guid>();
             }
         }
 
         public async Task EnqueueAsync(Job job)
         {
             // Ensure job is saved to database first
-            if (job.Id == 0)
+            if (job.Id == Guid.Empty || job.Id == null)
             {
                 await _unitOfWork.Repository<Job>().AddAsync(job);
                 await _unitOfWork.SaveChangesAsync();
@@ -45,7 +45,7 @@ namespace JobManagement.Infrastructure.Queue
             // Try to dequeue from highest priority to lowest
             foreach (JobPriority priority in Enum.GetValues(typeof(JobPriority)).Cast<JobPriority>().OrderBy(p => p))
             {
-                if (_jobQueues[priority].TryDequeue(out int jobId))
+                if (_jobQueues[priority].TryDequeue(out Guid jobId))
                 {
                     var job = await _unitOfWork.Repository<Job>().GetByIdAsync(jobId);
                     if (job != null)

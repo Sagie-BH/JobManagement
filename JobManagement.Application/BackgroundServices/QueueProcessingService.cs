@@ -1,4 +1,5 @@
-﻿using JobManagement.Domain.Entities;
+﻿using JobManagement.Application.Services.WorkerNodes;
+using JobManagement.Domain.Entities;
 using JobManagement.Domain.Interfaces;
 using JobManagement.Infrastructure.BackgroundServices;
 using JobManagement.Infrastructure.Interfaces;
@@ -24,19 +25,43 @@ namespace JobManagement.Application.BackgroundServices
             using var scope = _serviceProvider.CreateScope();
             var jobQueue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
             var workerAssignmentService = scope.ServiceProvider.GetRequiredService<IWorkerAssignmentService>();
+            var workerNodeService = scope.ServiceProvider.GetRequiredService<IWorkerNodeService>();
+
+            // Periodically log queue status
+            _logger.LogInformation("Processing queue - checking for jobs...");
+
+            // Check if there are available workers before trying to dequeue
+            var availableWorkers = await workerNodeService.GetAvailableWorkerNodesAsync();
+            if (!availableWorkers.Any())
+            {
+                _logger.LogDebug("No available workers at this time. Jobs will remain in queue.");
+                return; // No workers available, don't dequeue anything
+            }
 
             // Dequeue a job
             var job = await jobQueue.DequeueAsync();
             if (job == null)
             {
+                _logger.LogDebug("No jobs in queue to process at this time");
                 return; // No jobs in queue
             }
+
+            _logger.LogInformation($"Dequeued job {job.Id} ({job.Name}) for processing");
 
             // Check if job is scheduled for the future
             if (job.ScheduledStartTime.HasValue && job.ScheduledStartTime > DateTime.UtcNow)
             {
                 _logger.LogInformation($"Job {job.Id} is scheduled for future execution at {job.ScheduledStartTime}");
                 // Re-queue for later processing
+                await jobQueue.EnqueueAsync(job);
+                return;
+            }
+
+            // Recheck available workers to ensure one is still available
+            availableWorkers = await workerNodeService.GetAvailableWorkerNodesAsync();
+            if (!availableWorkers.Any())
+            {
+                _logger.LogInformation($"Workers became unavailable while processing job {job.Id}. Re-queueing.");
                 await jobQueue.EnqueueAsync(job);
                 return;
             }

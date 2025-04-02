@@ -1,5 +1,5 @@
-﻿using JobManagement.Domain.Entities;
-using JobManagement.Infrastructure.Interfaces;
+﻿using JobManagement.Application.Services.Metrics;
+using JobManagement.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 

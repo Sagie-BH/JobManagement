@@ -15,7 +15,7 @@ namespace JobManagement.Infrastructure.Repositories
             _dbContext = dbContext;
         }
 
-        public async Task<T> GetByIdAsync(int id)
+        public async Task<T> GetByIdAsync(Guid id)
         {
             return await _dbContext.Set<T>().FindAsync(id);
         }
@@ -76,13 +76,50 @@ namespace JobManagement.Infrastructure.Repositories
 
         public async Task<T> AddAsync(T entity)
         {
+            // Set the created date if it's an auditable entity
+            if (entity is AuditableEntity auditableEntity)
+            {
+                auditableEntity.CreatedOn = DateTime.UtcNow;
+                auditableEntity.LastModifiedOn = DateTime.UtcNow;
+
+                // Default creator info if not set
+                if (string.IsNullOrEmpty(auditableEntity.CreatedBy))
+                {
+                    auditableEntity.CreatedBy = "System";
+                }
+
+                if (string.IsNullOrEmpty(auditableEntity.LastModifiedBy))
+                {
+                    auditableEntity.LastModifiedBy = auditableEntity.CreatedBy;
+                }
+            }
+
             await _dbContext.Set<T>().AddAsync(entity);
             return entity;
         }
 
         public async Task UpdateAsync(T entity)
         {
+            // Update the modified date if it's an auditable entity
+            if (entity is AuditableEntity auditableEntity)
+            {
+                auditableEntity.LastModifiedOn = DateTime.UtcNow;
+
+                // Default modifier info if not set
+                if (string.IsNullOrEmpty(auditableEntity.LastModifiedBy))
+                {
+                    auditableEntity.LastModifiedBy = "System";
+                }
+            }
+
             _dbContext.Entry(entity).State = EntityState.Modified;
+
+            // If auditable, prevent changing the CreatedOn and CreatedBy fields
+            if (entity is AuditableEntity)
+            {
+                _dbContext.Entry(entity).Property("CreatedOn").IsModified = false;
+                _dbContext.Entry(entity).Property("CreatedBy").IsModified = false;
+            }
         }
 
         public async Task DeleteAsync(T entity)

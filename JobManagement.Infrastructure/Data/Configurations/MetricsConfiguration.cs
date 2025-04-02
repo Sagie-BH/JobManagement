@@ -34,7 +34,7 @@ namespace JobManagement.Infrastructure.Data.Configurations
         {
             builder.HasIndex(m => m.Timestamp);
             builder.HasIndex(m => m.SnapshotType);
-            builder.Property(m => m.SnapshotData).HasColumnType("longtext");
+            builder.Property(m => m.SnapshotData).HasColumnType("nvarchar(max)");
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using JobManagement.Infrastructure.Interfaces;
+﻿using JobManagement.Application.Services.Metrics;
+using JobManagement.Infrastructure.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
